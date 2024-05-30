@@ -22,6 +22,10 @@ locals {
       values = [
         <<-EOT
           settings:
+            clusterName: ${var.addon_context.eks_cluster_id}
+            clusterEndpoint: ${var.addon_context.aws_eks_cluster_endpoint}
+            defaultInstanceProfile: ${var.node_iam_instance_profile}
+            interruptionQueueName: ${try(aws_sqs_queue.this[0].name, "")}
             aws:
               clusterName: ${var.addon_context.eks_cluster_id}
               clusterEndpoint: ${var.addon_context.aws_eks_cluster_endpoint}
