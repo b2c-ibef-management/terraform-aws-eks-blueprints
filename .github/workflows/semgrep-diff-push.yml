@@ -1,0 +1,77 @@
+# Name of this GitHub Actions workflow.
+name: Semgrep DIFF
+
+on:
+  # Scan changed files in PRs (diff-aware scanning):
+  # pull_request: {}
+  # Scan on-demand through GitHub Actions interface:
+  # workflow_dispatch: {}
+  # Scan mainline branches and report all findings:
+  push:
+    branches:
+      - "bugfix-**"
+      - "bugfix/**"
+      - "feature-**"
+      - "feature/**"
+      - "hotfix-**"
+      - "release-**"
+  # Schedule the CI job (this method uses cron syntax):
+  # schedule:
+  # - cron: '20 17 * * *' # Sets Semgrep to scan every day at 17:20 UTC.
+  # It is recommended to change the schedule to a random time.
+
+jobs:
+  semgrep:
+    # User definable name of this GitHub Actions job.
+    name: semgrep/ci
+    # If you are self-hosting, change the following runs-on value:
+    runs-on: ubuntu-latest
+
+    container:
+      # A Docker image with Semgrep installed. Do not change this.
+      image: semgrep/semgrep
+
+    # Skip any PR created by dependabot to avoid permission issues:
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      # Fetch project source with GitHub Actions Checkout. Use either v3 or v4.
+      #- name: Chekcout STEP
+      #  uses: actions/checkout@v4
+      #  with:
+      #    ref: ${GITHUB_REF#refs/heads/}
+      #    fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Mark Git directory as safe
+        run: |
+          git config --global --add safe.directory $(pwd)
+      - name: Set Variables
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          # Concatenare ~1 al commit SHA
+          TARGET_COMMIT="${COMMIT_SHA}~1"
+          echo "TARGET_COMMIT=$TARGET_COMMIT" >> $GITHUB_ENV
+
+          # Trova il merge-base tra il commit corrente e il branch master
+          BASELINE_COMMIT=$(git rev-parse $TARGET_COMMIT)
+
+          # Imposta una variabile di output
+          echo "BASELINE_COMMIT=$BASELINE_COMMIT" >> $GITHUB_ENV
+          echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
+      - name: Output Variables
+        run: |
+          echo "Branch: ${{ env.branch }}"
+          echo "TARGET_COMMIT: ${{ env.TARGET_COMMIT }}"
+          echo "BASELINE_COMMIT: ${{ env.BASELINE_COMMIT }}"
+      # Run the "semgrep ci" command on the command line of the docker image.
+      - name: Semgrep Scan
+        run: semgrep ci --baseline-commit=$BASELINE_COMMIT --verbose --timeout=15 --timeout-threshold=5
+        env:
+          # Connect to Semgrep AppSec Platform through your SEMGREP_APP_TOKEN.
+          # Generate a token from Semgrep AppSec Platform > Settings
+          # and add it to your GitHub secrets.
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
